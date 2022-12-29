@@ -34,6 +34,14 @@ if [ -f /lib/rdk/t2Shared_api.sh ]; then
     source /lib/rdk/t2Shared_api.sh
 fi
 
+if [ -z $LOG_PATH ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
+        LOG_PATH="/rdklogs/logs"
+    else
+        LOG_PATH="/opt/logs"
+    fi
+fi
+
 JSONQUERY="/usr/bin/jsonquery"
 CONFIGPARAMGEN=/usr/bin/configparamgen
 DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail"
@@ -63,6 +71,11 @@ DOWNLOAD_APP_PROGRESS_FLAG="${APPLN_HOME_PATH}/.dlAppInProgress"
 DOWNLOAD_APP_HTTP_OUTPUT="$APPLN_HOME_PATH/download_httpoutput"
 ## File to save curl/wget response
 DOWNLOAD_APP_HTTP_RESPONSE="$APPLN_HOME_PATH/download_http_response"
+
+tlsLog ()
+{
+    echo "`/bin/timestamp`: $0: $*" >> $LOG_PATH/tlsError.log
+}
 
 CURL_TIMEOUT=10
 CURL_OPTION="-w"
@@ -358,12 +371,14 @@ generateDownloadUrl()
         else
             CURL_CMD="curl $TLS $IF_OPTION -fgL --connect-timeout $CURL_TLS_TIMEOUT  -H '$authorizationHeader' -w '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" '$serverUrl' > $HTTP_CODE"
         fi
+	FQDN=`echo "$serverUrl" | awk -F/ '{print $3}'`
     else
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
             CURL_CMD="curl $TLS $IF_OPTION -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --cert-status --connect-timeout $CURL_TLS_TIMEOUT -m 600"
         else
             CURL_CMD="curl $TLS $IF_OPTION -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --connect-timeout $CURL_TLS_TIMEOUT -m 600"
         fi
+	FQDN=`echo "$url" | awk -F/ '{print $3}'`
     fi
 }
 
@@ -426,6 +441,12 @@ sendAppDownloadRequest()
     eval $curl_request > $HTTP_CODE
     TLSRet=$?
     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
+    case $TLSRet in
+     35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
+       tlsLog "CERTERR, RDM, $TLSRet, $FQDN"
+       t2ValNotify "certerr_split" "RDM, $TLSRet, $FQDN"
+    ;;
+    esac
     if [ $TLSRet -ne 0 ];then
         log_msg "sendAppDownloadRequest: Package download http_code : $http_code   ret : $TLSRet"
         if [ -f $DOWNLOAD_LOCATION/$downloadFile ];then
