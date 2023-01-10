@@ -170,6 +170,22 @@ installApp()
         return 0
 }
 
+searchApp()
+{
+    APP_NAME="$1"
+    PKG_DWLD_PATH=""
+    PKG_INST_PATH=""
+    if [ -d "${TMP_DWLD_DIR}${RDM_DWLD_DIR}/$APP_NAME" -a -d "${TMP_DWLD_DIR}/$APP_NAME" ]; then
+        PKG_DWLD_PATH="${TMP_DWLD_DIR}${RDM_DWLD_DIR}/$APP_NAME"
+        PKG_INST_PATH="${TMP_DWLD_DIR}/$APP_NAME"
+    elif [  -d "${MOUNT_DWLD_DIR}${RDM_DWLD_DIR}/$APP_NAME" -a -d "${MOUNT_DWLD_DIR}/$APP_NAME" ]; then
+        PKG_DWLD_PATH="${MOUNT_DWLD_DIR}${RDM_DWLD_DIR}/$APP_NAME"
+        PKG_INST_PATH="${MOUNT_DWLD_DIR}/$APP_NAME"
+    fi
+
+    APP_PATHS="$PKG_DWLD_PATH $PKG_INST_PATH"
+    echo "$APP_PATHS"
+}
 
 verifyAppSignature()
 {
@@ -203,7 +219,6 @@ updatePkgStatus()
         broadcastRDMPkgStatus "$pkg_info"
 }
 
-
 updatePackage()
 {
         pkg_name=$1
@@ -211,11 +226,20 @@ updatePackage()
 
         APP_SIGNED_TAR_FILE="${pkg_name}_${pkg_ver}-signed.tar"
 
-        APP_DWLD_DIR="${TMP_DWLD_DIR}${RDM_DWLD_DIR}/$pkg_name"
-		APP_HOME_DIR="${TMP_DWLD_DIR}/$pkg_name"
+        #Make sure the packages are cleaned up before installing
+        APP_PATH=$(searchApp $pkg_name)
 
-        APP_PACKAGE_FILE="${pkg_name}_${pkg_ver}.tar"
-        APP_SIGN_FILE="${pkg_name}_${pkg_ver}.sig"
+        PKG_DWLD_PATH=$(echo ${APP_PATH%% *})
+        PKG_INST_PATH=$(echo ${APP_PATH##* })
+
+        if [ -n "$PKG_DWLD_PATH" -a -n "$PKG_INST_PATH" ]; then
+            log "Clean up $PKG_DWLD_PATH and $PKG_INST_PATH"
+            rm -rf "$PKG_DWLD_PATH"
+            rm -rf "$PKG_INST_PATH"
+        fi
+
+        APP_DWLD_DIR="${TMP_DWLD_DIR}${RDM_DWLD_DIR}/$pkg_name"
+        APP_HOME_DIR="${TMP_DWLD_DIR}/$pkg_name"
 
         log "Updating ${pkg_name} package to latest version v${pkg_ver}"
 
@@ -305,6 +329,8 @@ do
                 cloud_bundle_ver=$(echo $bund_vers | awk -F":" '{print $2}')
                 APP_NAME="$cloud_bundle_name"
                 APP_VERSION="$cloud_bundle_ver"
+                APP_PACKAGE_FILE="${APP_NAME}_${APP_VERSION}.tar"
+                APP_SIGN_FILE="${APP_NAME}_${APP_VERSION}.sig"
                 if [ -z "$cloud_bundle_name" -o -z "$cloud_bundle_ver" ]; then
                         log "Invalid input - $bund_vers. Package name or Package version missing"
                         updatePkgStatus "$RDM_PKG_INVALID_INPUT"
@@ -331,16 +357,27 @@ do
                                 if [ "x$cloud_bundle_ver" != "x$cpe_bundle_ver" ]; then
                                         log "CPE package version ("$cpe_bundle_ver") and Requested package version ("$cloud_bundle_ver") are different for ${cloud_bundle_name}"
                                 else
-                                        log "CPE package version ("$cpe_bundle_ver") and Requested package version ("$cloud_bundle_ver") are same for ${cloud_bundle_name}. Validate the package"
-                                        verifyAppSignature
-                                        if [ "$?" -eq "0" ]; then
-                                                log "Signature verification successful for ${cloud_bundle_name} package version ${cloud_bundle_ver}"
-                                                updatePkgStatus "$RDM_PKG_INSTALL_COMPLETE"
-                                                continue
+                                        log "CPE package version ("$cpe_bundle_ver") and Requested package version ("$cloud_bundle_ver") are same for ${cloud_bundle_name}"
+                                        APP_PATH=$(searchApp $cloud_bundle_name)
+                                        APP_DWLD_DIR=$(echo "${APP_PATH%% *}")
+                                        APP_HOME_DIR=$(echo "${APP_PATH##* }")
+                                        if [ -n "$APP_DWLD_DIR" -a -n "$APP_HOME_DIR" ]; then
+                                            sanityCheckBundle $APP_DWLD_DIR
+                                            if [ "$?" -eq "0" ]; then
+                                                log "$APP_NAME package is already available. Hence validating the package"
+                                                verifyAppSignature
+                                                if [ "$?" -eq "0" ]; then
+                                                    log "Signature verification successful for ${cloud_bundle_name} package version ${cloud_bundle_ver}"
+                                                    updatePkgStatus "$RDM_PKG_INSTALL_COMPLETE"
+                                                    continue
+                                                else
+                                                    log "Signature verification failed for ${cloud_bundle_name} package version ${cloud_bundle_ver}"
+                                                    rm -rf "${APP_DWLD_DIR}"
+                                                    rm -rf "${APP_HOME_DIR}"
+                                                fi
+                                            fi
                                         else
-                                                log "Signature verification failed for ${cloud_bundle_name} package version ${cloud_bundle_ver}"
-                                                rm -rf ${APP_DWLD_DIR}
-                                                rm -rf ${APP_HOME_DIR}
+                                            log "$APP_NAME package not available in CPE"
                                         fi
                                 fi
 
