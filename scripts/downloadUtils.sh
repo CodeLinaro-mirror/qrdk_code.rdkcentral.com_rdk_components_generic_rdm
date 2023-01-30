@@ -579,6 +579,9 @@ applicationDownload()
                     log_msg "applicationDownload: Direct App download failed, retry:$retries, return:$ret, httpcode:$http_code"
                     retries=`expr $retries + 1`
                 done
+            else
+                log_msg "applicationDownload: Direct App download blocked"
+                return 1
             fi
             # Retry image download attempts via CodeBig
             if [ $ret -ne 0 ] && [ "$http_code" == "000" ]; then
