@@ -111,14 +111,19 @@ getInstalledPackages()
     PWD=$(pwd)
     cd $RDM_APP_PATH
     dir_list=$(ls -d */ | tr -d "/")
+    excludeDirList="etc rdm"
     for app in $dir_list; do
-        APP_MANIFEST=$RDM_APP_PATH/$app/${app}_cpemanifest
-        if [ -f "$APP_MANIFEST" ]; then
-            pkgList="$app $pkgList"
+        if (echo "$excludeDirList" | grep -q "$app"); then
+            continue
         else
-            APP_CPE_METADATA_FILE="$(find ${RDM_APP_PATH}/${app} -maxdepth 2 -name "*_package.json" | sort | uniq | xargs)"
-            if [ -f "$APP_CPE_METADATA_FILE" ]; then
+            APP_MANIFEST=$RDM_APP_PATH/$app/${app}_cpemanifest
+            if [ -f "$APP_MANIFEST" ]; then
                 pkgList="$app $pkgList"
+            else
+                APP_CPE_METADATA_FILE="$(find ${RDM_APP_PATH}/${app} -maxdepth 2 -name "*_package.json" | sort | uniq | xargs)"
+                if [ -f "$APP_CPE_METADATA_FILE" ]; then
+                    pkgList="$app $pkgList"
+                fi
             fi
         fi
     done
