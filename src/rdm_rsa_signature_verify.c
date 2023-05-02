@@ -158,9 +158,18 @@ static int prepare_sig_file(char *sig_file) {
         FILE *file_in = fopen(sig_file, "r");
         FILE *file_out = fopen(RDM_TMP_SIGFILE, "w+");
 
-        if (NULL == file_in || NULL == file_out)
-            return 1;
+        if (NULL == file_in || NULL == file_out){
+            //CID 160227: Resource leak (RESOURCE_LEAK)
+            //CID 160216: Resource leak (RESOURCE_LEAK)
+            if (file_in != NULL) {
+                   fclose(file_in);
+            }
+            if (file_out != NULL) {
+                   fclose(file_out);
+            }
 
+            return 1;
+        }
         while((read = fread(buffer, sizeof(char), sizeof(buffer), file_in)) > 0)
         {
                 if(0 == skip && read > 6) {
@@ -172,15 +181,11 @@ static int prepare_sig_file(char *sig_file) {
                 }
         }
 
+        rename(RDM_TMP_SIGFILE, sig_file);
+        //CID 160227: Resource leak (RESOURCE_LEAK)
+        //CID 160216: Resource leak (RESOURCE_LEAK)
         fclose(file_out);
         fclose(file_in);
-
-        len = strlen("/bin/mv") + strlen(RDM_TMP_SIGFILE) + strlen(sig_file) + 3;
-        mv_command = (char*) calloc(len, sizeof(char));
-        sprintf(mv_command, "/bin/mv %s %s", RDM_TMP_SIGFILE, sig_file);
-
-        system(mv_command);
-        free(mv_command);
 
         return 0;
 }
@@ -194,6 +199,15 @@ static int prepare_app_manifest(char *etc_manifest_file, char *cache_manifest_fi
         FILE *file_out = fopen(cache_manifest_file, "w+");
 
         if(file_in == NULL || file_out == NULL) {
+          //CID 160224: Resource leak (RESOURCE_LEAK)
+          //CID 160225: Resource leak (RESOURCE_LEAK)
+          if (file_in != NULL) {
+                 fclose(file_in);
+                       }
+          if (file_out != NULL) {
+                 fclose(file_out);
+                }
+
                 return 1;
         }
 
@@ -492,9 +506,12 @@ error:
 static
 int rdm_openssl_file_hash_sha256( const char *data_file, size_t file_len, unsigned char *hash_buffer, int *buffer_len )
 {
-        int BUFSIZE;
+        int BUFSIZE = 0 ;
+        //CID 163885: Dereference before null check (REVERSE_INULL)
+        if(data_file != NULL){
         if ( manifest_file_size(data_file, &BUFSIZE) != 0 )
               return retcode_datafile_err;
+        }
         EVP_MD_CTX *mdctx=NULL;
         FILE *data_fh=NULL;
         unsigned char* buffer= (unsigned char*)calloc(sizeof(unsigned char), BUFSIZE );
@@ -598,9 +615,12 @@ error:
 static
 int rdm_openssl_file_hash_sha256_pkg_components( const char *data_file, size_t file_len, unsigned char *hash_buffer, int *buffer_len )
 {
-        int BUFSIZE;
+        int BUFSIZE = 0 ;
+        //CID 163873: Dereference before null check (REVERSE_INULL)
+        if(data_file != NULL){
         if ( manifest_file_size(data_file, &BUFSIZE) != 0 )
               return retcode_datafile_err;
+        }
         EVP_MD_CTX *mdctx=NULL;
         FILE *manifest_fh=NULL;
         FILE *data_fh=NULL;
@@ -652,8 +672,9 @@ int rdm_openssl_file_hash_sha256_pkg_components( const char *data_file, size_t f
             debug_print("rdm_openssl_file_hash_sha256_pkg_components(): memory allocation failed\n");
             goto error;
         }
-        fread(manifest, BUFSIZE, 1, manifest_fh);
-        fclose(manifest_fh);
+        bytesread = fread(manifest, BUFSIZE, 1, manifest_fh);//CID 21603: Ignoring number of bytes read (CHECKED_RETURN)
+        //fclose(manifest_fh);
+        manifest[BUFSIZE - 1] = '\0';//CID 136825: String not null terminated (STRING_NULL)
         path_buff = strtok(manifest, "\t\r\n");
         while ( path_buff != NULL )
         {
@@ -698,6 +719,7 @@ error:
         if ( mdctx != NULL ) EVP_MD_CTX_destroy( mdctx );
         if ( manifest != NULL) free( manifest );
         if ( buffer != NULL ) free( buffer );
+        if ( manifest_fh != NULL) fclose( manifest_fh );//CID 21687: Resource leak (RESOURCE_LEAK)
         return retval;
 }
 
@@ -807,7 +829,7 @@ error:
         if ( sig_fh != NULL ) fclose( sig_fh );
         if ( pub_fh != NULL ) fclose( pub_fh );
         if ( mdctx != NULL ) EVP_MD_CTX_destroy( mdctx );
-        if ( pkey != NULL ) EVP_PKEY_free( pkey );
+	//CID 314565: Use after free (USE_AFTER_FREE)
 
         /* other clean here */
 
