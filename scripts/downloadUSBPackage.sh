@@ -62,14 +62,6 @@ log_msg() {
   echo "[$DateTime] [pid=$$] $STR" >>$LOG_FILE
 }
 
-packageLocation=""
-# Query RFC to check if USB auto mount Enabled or not
-USBMOUNT_ENABLE=`/usr/bin/tr181Set -g Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.USB_AutoMount.Enable 2>&1 > /dev/null`
-if [ "x$USBMOUNT_ENABLE" != "xtrue" ]; then
-    log_msg "USB AutoMount is DISABLED for this device"
-    exit 0
-fi
-
 # Extract & validate Signed package resides at given USB 
 # mount point.  
 USB_MOUNT_POINT=$1
@@ -77,92 +69,30 @@ if [ ! -d $USB_MOUNT_POINT ]; then
     log_msg "Mount point $USB_MOUNT_POINT does not exists"
 fi
 
-if [ ! -d ${USB_MOUNT_POINT}/partnerapps ];then
-     mkdir -p ${USB_MOUNT_POINT}/partnerapps
-else
-     rm -rf ${USB_MOUNT_POINT}/partnerapps/*
-fi
-
 # Check if any signed tarball present
 # Loop to validate all packages resides at USB Mount point
-for file in `find $USB_MOUNT_POINT -name '*.tar' -type f`
+for file in `find $USB_MOUNT_POINT -name '*-signed.tar' -type f`
 do
     if [ ! -f $file ]; then
         log_msg "Packaged file $file does not exists"
         log_msg "Continue to next package"
         continue;
     fi
- 
-    fileName=`echo $file | xargs basename`
-    filePath=`echo $file | xargs dirname` 
-    log_msg "Found signed tarball package $fileName on path $filePath"
-    # extract the package tar ball
-    # Create package directory to extract tarball
-    packageDir="${fileName%.*}"
-    destn_path=`echo ${packageDir%-*}`
-    packageLocation="${filePath}/.rdm_tmp"
-    # Check if given package has already been extracted then remove it
-    if [ -d $packageLocation ]; then
-        log_msg "Package $file has already extracted"
-        log_msg "Removing package to extract & reValidate"
-        rm -rf ${packageLocation}/*
-    else
-        log_msg "Extracting the Package $fileName "
-    fi
-    mkdir -p "${packageLocation}"
-    tar -xvf "${file}" -C "${packageLocation}"
-        
-    # verify if all required files present
-    package_signatureFile=`ls $packageLocation/*.sig| xargs basename`
-    if [ ! -f $packageLocation/$package_signatureFile ];then
-        log_msg "Signature does not exists"
-        exit 1
-    fi
-    package_cert=`ls $packageLocation/*.crt| xargs basename`
-    if [ ! -f $packageLocation/$package_cert ];then
-        log_msg "Verification Certificate does not exists"
-        exit 1
-    fi
 
-    # both tar & ipk format supported
-    package_tarFile=`ls $packageLocation/*.tar| xargs basename`
-    if [ ! -f $packageLocation/$package_tarFile ];then
-        log_msg "Packaged does not exists"
-        exit 1
-    fi
-    log_msg "$packageLocation $package_tarFile"
+    #Get App name
+    fileName=$(basename $file)
+    pkg=$(echo "${fileName##*_}")
+    appName=$(echo "${pkg%-signed*}")
 
-    # openssl Signature verification 
-    log_msg "Performing Signaure validation on ${package_tarFile}"
-    sh /etc/rdm/opensslVerifier.sh ${packageLocation} ${package_tarFile} ${package_signatureFile} "openssl" ${package_cert}
-    if [ $? -ne 0 ] ; then
-       log_msg "Signature validation failed"
-       t2CountNotify "RDM_ERR_rsa_signature_failed"
-       rm -rf $packageLocation/$package_tarFile
-       rm -rf $packageLocation/$package_signatureFile
-       rm -rf $packageLocation//$package_cert
-       rm -rf $packageLocation/*
-       exit 1
+    #Check whether the rdm package available in usb belongs to the currently running firmware 
+    grep -q $fileName /etc/rdm/rdm-manifest.json
+    if [ $? -eq 0 ]; then
+        log_msg "Installing $fileName from usb"
+
+        #Invoke download_apps.sh to skip the download and to install the package. Should pass appName and file path as arguments
+        /usr/bin/download_apps.sh $appName $file
     else
-       log_msg "Signature validation Successful"
+        log_msg "$fileName does not belong to the currently running firmware. Hence skipping it"
+        continue
     fi
-        
-    # extract final package
-    package_extension="${package_tarFile##*.}"
-    case "${package_extension}" in
-    ipk)
-        ar -x ${packageLocation}/${package_tarFile}
-    ;;
-    tar)
-        tar -xvf ${packageLocation}/${package_tarFile} -C ${USB_MOUNT_POINT}/partnerapps
-    ;;
-    *)
-        log_msg "Package extension $package_extension not supported"
-    ;; 
-    esac
- 
-    rm -rf $packageLocation/$package_tarFile
-    rm -rf $packageLocation/$package_signatureFile
-    rm -rf $packageLocation/$package_cert
-    # End of loop to validate all USB packages
 done

@@ -122,6 +122,10 @@ else
      log_msg "Using the custom Package name: $DOWNLOAD_PKG_NAME"
 fi
 
+if [ -n "$6" ]; then
+    SKIP_DOWNLOAD="$6"
+fi
+
 log_msg "DOWNLOAD_APP_MODULE = $DOWNLOAD_APP_MODULE"
 log_msg "PKG_AUTHENTICATION = $PKG_AUTHENTICATION"
 log_msg "PKG_EXTN = $PACKAGE_EXTN"
@@ -151,11 +155,6 @@ fi
 
 log_msg "APPLN_HOME_PATH = $APPLN_HOME_PATH"
 
-# TODO Will Update after RFC changes
-DOWNLOAD_APP_SSR_LOCATION=/nvram/.download_ssr_location
-
-HTTP_CODE="$APPLN_HOME_PATH/httpcode"
-
 updatePkgStatus()
 {
         APP_INST_STATUS="$1"
@@ -168,14 +167,6 @@ updatePkgStatus()
         broadcastRDMPkgStatus "$pkg_info"
 }
 
-
-# Initialize codebig flag value
-UseCodebig=0
-log_msg "Checking Codebig flag..." 
-IsDirectBlocked
-UseCodebig=$?
-
-
 # setup the workspace and initial cleanup
 if [ ! -d $APPLN_HOME_PATH ];then
      mkdir -p $APPLN_HOME_PATH
@@ -186,19 +177,32 @@ if [ ! -d $DOWNLOAD_LOCATION ]; then
       mkdir -p $DOWNLOAD_LOCATION
 fi
 
-if [ ! $ARM_SCP_IP_ADRESS ];then
-      log_msg "Either Missing ARM SCP IP ADDRESS , Please Check /etc/device.properties "
-      log_msg "             Or               "
-      log_msg "Platform with Single Processor "
-      log_msg "             Or               "
-      log_msg "Processes are running on the ATOM side "
-fi
+if [ $SKIP_DOWNLOAD -eq 0 ]; then
+    # TODO Will Update after RFC changes
+    DOWNLOAD_APP_SSR_LOCATION=/nvram/.download_ssr_location
 
-url=$(getDownloadUrl)
-if [ -z $url ]; then
-    log_msg "RDM download url is not available in both $RDM_SSR_LOCATION and RFC parameter. Exiting..."
-    updatePkgStatus "$RDM_PKG_INVALID_INPUT"
-    exit 1
+    HTTP_CODE="$APPLN_HOME_PATH/httpcode"
+
+    # Initialize codebig flag value
+    UseCodebig=0
+    log_msg "Checking Codebig flag..."
+    IsDirectBlocked
+    UseCodebig=$?
+
+    if [ ! $ARM_SCP_IP_ADRESS ];then
+        log_msg "Either Missing ARM SCP IP ADDRESS , Please Check /etc/device.properties "
+        log_msg "             Or               "
+        log_msg "Platform with Single Processor "
+        log_msg "             Or               "
+        log_msg "Processes are running on the ATOM side "
+    fi
+
+    url=$(getDownloadUrl)
+    if [ -z $url ]; then
+        log_msg "RDM download url is not available in both $RDM_SSR_LOCATION and RFC parameter. Exiting..."
+        updatePkgStatus "$RDM_PKG_INVALID_INPUT"
+        exit 1
+    fi
 fi
 
 # Download the File Package  if not already downloaded
@@ -245,7 +249,7 @@ if [ "$DOWNLOAD_APP_SIZE" ];then
             "*")
                log_msg "Wrong Measurement Unit for App Size (nB/nK/nM/nG)"
                exit
-               ;; 
+               ;;
          esac
      else
          FINAL_DOWNLOAD_APP_SIZE=$value$scale
@@ -257,7 +261,7 @@ if [ "$DOWNLOAD_APP_SIZE" ];then
          if [ "$mountFlag" ];then umount $APPLN_HOME_PATH ; fi
          mount -t tmpfs -o size=$FINAL_DOWNLOAD_APP_SIZE -o mode=544 tmpfs $APPLN_HOME_PATH
      fi
-fi 
+fi
 
 # Extract the Package
 package_signatureFile=$( is_file_exists $DOWNLOAD_LOCATION/*-pkg.sig )
