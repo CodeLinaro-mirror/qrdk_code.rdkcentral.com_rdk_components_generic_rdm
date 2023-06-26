@@ -34,6 +34,11 @@ if [ -f /lib/rdk/t2Shared_api.sh ]; then
     source /lib/rdk/t2Shared_api.sh
 fi
 
+if [ -f $RDK_PATH/mtlsUtils.sh ]; then
+    . $RDK_PATH/mtlsUtils.sh
+    MTLSCMD=`getMtlsCreds apps_rdm.sh`
+fi
+
 if [ -z $LOG_PATH ]; then
     if [ "$DEVICE_TYPE" = "broadband" ]; then
         LOG_PATH="/rdklogs/logs"
@@ -374,9 +379,9 @@ generateDownloadUrl()
 	FQDN=`echo "$serverUrl" | awk -F/ '{print $3}'`
     else
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
-            CURL_CMD="curl $TLS $IF_OPTION -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --cert-status --connect-timeout $CURL_TLS_TIMEOUT -m 600"
+            CURL_CMD="curl $TLS $IF_OPTION $MTLSCMD -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --cert-status --connect-timeout $CURL_TLS_TIMEOUT -m 600"
         else
-            CURL_CMD="curl $TLS $IF_OPTION -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --connect-timeout $CURL_TLS_TIMEOUT -m 600"
+            CURL_CMD="curl $TLS $IF_OPTION $MTLSCMD -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --connect-timeout $CURL_TLS_TIMEOUT -m 600"
         fi
 	FQDN=`echo "$url" | awk -F/ '{print $3}'`
     fi
@@ -389,7 +394,7 @@ sendDownloadRequest()
     counter=0
     curl_request=$1
     #Sensitive info like Authorization signature should not print
-    curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g"`
+    curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g; s#devicecert_1.*-fgL#devicecert_1.pk12<masked> -fgL#g; s#staticXpkiCr.*-fgL#staticXpkiCrt.pk12<masked> -fgL#g"`
     while [ $status -ne 0 ]
     do
         log_msg "sendDownloadRequest: CURL_CMD: ${curl_cmd}"
@@ -436,7 +441,7 @@ sendAppDownloadRequest()
 {
     curl_request=$1
     #Sensitive info like Authorization signature should not print
-    curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g"`
+    curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g; s#devicecert_1.*-fgL#devicecert_1.pk12<masked> -fgL#g; s#staticXpkiCr.*-fgL#staticXpkiCrt.pk12<masked> -fgL#g"`
     log_msg "sendAppDownloadRequest: CURL_CMD: ${curl_cmd}"
     eval $curl_request > $HTTP_CODE
     TLSRet=$?
