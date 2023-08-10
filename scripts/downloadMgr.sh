@@ -177,7 +177,7 @@ if [ ! -d $DOWNLOAD_LOCATION ]; then
       mkdir -p $DOWNLOAD_LOCATION
 fi
 
-if [ $SKIP_DOWNLOAD -eq 0 ]; then
+if [[ "$SKIP_DOWNLOAD" -eq 0 ]]; then
     # TODO Will Update after RFC changes
     DOWNLOAD_APP_SSR_LOCATION=/nvram/.download_ssr_location
 
