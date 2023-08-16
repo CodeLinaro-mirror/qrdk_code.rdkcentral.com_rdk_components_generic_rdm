@@ -181,11 +181,15 @@ static int prepare_sig_file(char *sig_file) {
                 }
         }
 
-        rename(RDM_TMP_SIGFILE, sig_file);
-        //CID 160227: Resource leak (RESOURCE_LEAK)
-        //CID 160216: Resource leak (RESOURCE_LEAK)
         fclose(file_out);
         fclose(file_in);
+
+        len = strlen("/bin/mv") + strlen(RDM_TMP_SIGFILE) + strlen(sig_file) + 3;
+        mv_command = (char*) calloc(len, sizeof(char));
+        snprintf(mv_command, len, "/bin/mv %s %s", RDM_TMP_SIGFILE, sig_file);
+
+        system(mv_command);
+        free(mv_command);
 
         return 0;
 }
