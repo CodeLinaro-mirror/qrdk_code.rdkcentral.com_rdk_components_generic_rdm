@@ -126,6 +126,8 @@ if [ -n "$6" ]; then
     SKIP_DOWNLOAD="$6"
 fi
 
+DOWNLOAD_PKG_TYPE=`/usr/bin/jsonquery -f /etc/rdm/rdm-manifest.json  --path=//packages/$DOWNLOAD_APP_MODULE/pkg_type`
+
 log_msg "DOWNLOAD_APP_MODULE = $DOWNLOAD_APP_MODULE"
 log_msg "PKG_AUTHENTICATION = $PKG_AUTHENTICATION"
 log_msg "PKG_EXTN = $PACKAGE_EXTN"
@@ -445,6 +447,61 @@ fi
 
 log_msg "RDM package download success: $DOWNLOAD_PKG_NAME"
 updatePkgStatus "$RDM_PKG_INSTALL_COMPLETE"
+
+if [ "$DOWNLOAD_PKG_TYPE" = "plugin" ]; then
+    plugin_metadata="${APPLN_HOME_PATH}/etc/apps/${DOWNLOAD_APP_MODULE}_package.json"
+    if [ -f "$plugin_metadata" ]; then
+        callsign=$(grep '"callsign":' "$plugin_metadata" | cut -d '"' -f4)
+        log_msg "Callsign of ${DOWNLOAD_APP_MODULE} is $callsign"
+
+        THUNDER_SECURITY_UTIL=/usr/bin/WPEFrameworkSecurityUtility
+        THUNDER_SECURITY_TOKEN_FILE=/tmp/.wpe_secure_token
+        curl_header="\"Content-Type: application/json\""
+        wpe_url="http://127.0.0.1:9998/jsonrpc"
+        plugin_status_file="/tmp/${DOWNLOAD_APP_MODULE}"
+
+        #Check plugin initial state is unavailable
+        method="Controller.1.status@"
+        json_data="'{\"jsonrpc\":\"2.0\",\"id\":\"3\",\"method\": \"$method$callsign\"}'"
+
+        retryCount=0
+        while [ $retryCount -lt 12 ]; do
+            $THUNDER_SECURITY_UTIL | grep token > $THUNDER_SECURITY_TOKEN_FILE
+            auth_token=`/usr/bin/jsonquery -f $THUNDER_SECURITY_TOKEN_FILE --path=//token`
+            auth_header="\"Authorization: Bearer $auth_token\""
+            CURL_CMD="curl -H $curl_header -H $auth_header -X POST -d $json_data $wpe_url"
+            eval $CURL_CMD > ${plugin_status_file}_status
+
+            current_state=$(grep -o '"state":"[^"]*' ${plugin_status_file}_status | sed 's/"state":"//')
+            if [ -n "$current_state" ]; then
+                break
+            fi
+            sleep 5
+            retryCount=$((retryCount + 1))
+        done
+
+        if [ -n "$current_state" -a "$current_state" = "unavailable" ]; then
+            log_msg "Current state of ${DOWNLOAD_APP_MODULE} is $current_state"
+            method="Controller.1.deactivate"
+            json_data="'{\"jsonrpc\":\"2.0\",\"id\":\"3\",\"method\": \"$method\", \"params\":{\"callsign\":\"$callsign\"}}'"
+
+            CURL_CMD="curl -H $curl_header -H $auth_header -X POST -d $json_data $wpe_url"
+            eval $CURL_CMD > ${plugin_status_file}_deactivateStatus
+
+            deactivation_status=`/usr/bin/jsonquery -f ${plugin_status_file}_deactivateStatus --path=//result`
+
+            if [ "$deactivation_status" = "null" ]; then
+                log_msg "${DOWNLOAD_APP_MODULE} successfully moved to deactivated state"
+            else
+                log_msg "${DOWNLOAD_APP_MODULE} failed to move to deactivated state"
+            fi
+        else
+            log_msg "Current state of ${DOWNLOAD_APP_MODULE} is $current_state. Not deactivating it since it is not in unavailable state"
+        fi
+    else
+        log_msg "$plugin_metadata not found"
+    fi
+fi
 
 log_msg "$DOWNLOAD_LOCATION// CleanUp"
 if [ "$APPLN_HOME_PATH" != "$APP_MOUNT_PATH/${DOWNLOAD_APP_MODULE}" ]; then
