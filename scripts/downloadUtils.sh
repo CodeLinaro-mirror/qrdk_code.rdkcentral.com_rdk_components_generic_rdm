@@ -34,16 +34,8 @@ if [ -f /lib/rdk/t2Shared_api.sh ]; then
     source /lib/rdk/t2Shared_api.sh
 fi
 
-if [ "$DEVICE_TYPE" = "broadband" ] ; then
-   if [ -f $RDK_PATH/exec_curl_mtls.sh ]; then
+if [ -f $RDK_PATH/exec_curl_mtls.sh ]; then
       . $RDK_PATH/exec_curl_mtls.sh
-      MTLSCMD=""
-   fi
-else
-   if [ -f $RDK_PATH/mtlsUtils.sh ]; then
-    . $RDK_PATH/mtlsUtils.sh
-    MTLSCMD=`getMtlsCreds apps_rdm.sh`
-   fi
 fi
 
 if [ -z $LOG_PATH ]; then
@@ -386,14 +378,11 @@ generateDownloadUrl()
         FQDN=`echo "$serverUrl" | awk -F/ '{print $3}'`
     else
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
-            CURL_CMD="$TLS $IF_OPTION $MTLSCMD -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --cert-status --connect-timeout $CURL_TLS_TIMEOUT -m 600"
+            CURL_CMD="$TLS $IF_OPTION -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --cert-status --connect-timeout $CURL_TLS_TIMEOUT -m 600"
         else
-            CURL_CMD="$TLS $IF_OPTION $MTLSCMD -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --connect-timeout $CURL_TLS_TIMEOUT -m 600"
+            CURL_CMD="$TLS $IF_OPTION -fgL $CURL_OPTION '%{http_code}\n' -o \"$DOWNLOAD_LOCATION/$file\" \"$url\" --connect-timeout $CURL_TLS_TIMEOUT -m 600"
         fi
         FQDN=`echo "$url" | awk -F/ '{print $3}'`
-        if [ "$DEVICE_TYPE" != "broadband" ]; then
-            CURL_CMD="curl $CURL_CMD"
-        fi
     fi
 }
 
@@ -451,9 +440,7 @@ sendAppDownloadRequest()
     curl_request=$1
     #Sensitive info like Authorization signature should not print
     curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g; s#devicecert_1.*-fgL#devicecert_1.pk12<masked> -fgL#g; s#staticXpkiCr.*-fgL#staticXpkiCrt.pk12<masked> -fgL#g"`
-    log_msg "sendAppDownloadRequest: CURL_CMD: ${curl_cmd}"
-    eval $curl_request > $HTTP_CODE
-    TLSRet=$?
+    TLSRet=` exec_curl_mtls "$curl_request" "log_msg"`
     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
     case $TLSRet in
      35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
