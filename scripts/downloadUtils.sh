@@ -439,9 +439,16 @@ sendDownloadRequest()
 sendAppDownloadRequest()
 {
     curl_request=$1
+    flag=$2
     #Sensitive info like Authorization signature should not print
     curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g; s#devicecert_1.*-fgL#devicecert_1.pk12<masked> -fgL#g; s#staticXpkiCr.*-fgL#staticXpkiCrt.pk12<masked> -fgL#g"`
-    TLSRet=` exec_curl_mtls "$curl_request" "log_msg"`
+    if [ "$flag" = 1 ]; then
+          log_msg "sendAppDownloadRequest: CURL_CMD: ${curl_cmd}"
+          eval $curl_request > $HTTP_CODE
+          TLSRet=$?
+    else
+          TLSRet=` exec_curl_mtls "$curl_request" "log_msg"`
+    fi
     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
     case $TLSRet in
      35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
@@ -526,7 +533,7 @@ applicationDownload()
                         fi
                         log_msg "applicationDownload: Attempting Codebig App download"
                         generateDownloadUrl $downloadFile $downloadUrl $UseCodebig
-                        sendAppDownloadRequest "$CURL_CMD"
+                        sendAppDownloadRequest "$CURL_CMD" $UseCodebig
                         ret=$TLSRet
                         http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
                         if [ "$http_code" = "200" ]; then
@@ -571,7 +578,7 @@ applicationDownload()
                     fi
                     log_msg "applicationDownload: Attempting Direct App download"
                     generateDownloadUrl $downloadFile $downloadUrl $UseCodebig
-                    sendAppDownloadRequest "$CURL_CMD"
+                    sendAppDownloadRequest "$CURL_CMD" $UseCodebig
                     ret=$TLSRet
                     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
                     if [ "$http_code" == "200" ]; then
@@ -600,7 +607,7 @@ applicationDownload()
                             fi
                             log_msg "applicationDownload: Attempting Codebig App download"
                             generateDownloadUrl $downloadFile $downloadUrl $UseCodebig
-                            sendAppDownloadRequest "$CURL_CMD"
+                            sendAppDownloadRequest "$CURL_CMD" $UseCodebig
                             ret=$TLSRet
                             http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
                             if [ "$http_code" = "200" ]; then
