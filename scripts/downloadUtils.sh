@@ -394,10 +394,11 @@ sendDownloadRequest()
     curl_request=$1
     #Sensitive info like Authorization signature should not print
     curl_cmd=`echo $curl_request | sed -e "s|-H.*-w|-H 'AuthorizationHeader' -w|g; s#devicecert_1.*-fgL#devicecert_1.pk12<masked> -fgL#g; s#staticXpkiCr.*-fgL#staticXpkiCrt.pk12<masked> -fgL#g"`
+    FQDN=`echo "$downloadUrl" | awk -F/ '{print $3}'`
     while [ $status -ne 0 ]
     do
         log_msg "sendDownloadRequest: CURL_CMD: curl ${curl_cmd}"
-        TLSRet=` exec_curl_mtls "$curl_request"`
+        TLSRet=` exec_curl_mtls "$curl_request" "RDM" "$FQDN"`
         http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
         if [ $TLSRet -ne 0 ];then
             log_msg "sendDownloadRequest: Package download http_code : $http_code   ret : $TLSRet"
