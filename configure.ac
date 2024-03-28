@@ -26,7 +26,7 @@ AC_CONFIG_SRCDIR([src/rdm_rsa_signature_verify.c])
 AC_CONFIG_HEADERS([config.h])
 
 LT_INIT
-
+IS_LIBRDKCONFIG_ENABLED=" "
 # Checks for programs.
 AC_PROG_CC
 
@@ -43,6 +43,20 @@ AC_CHECK_HEADERS([string.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
+
+AC_ARG_ENABLE([mountutils],
+        AS_HELP_STRING([--enable-mountutils],[enables mountutils replacement (default is no)]),
+        [
+          case "${enableval}" in
+           yes) IS_LIBRDKCONFIG_ENABLED=true
+                LIBRDKCONFIG_FLAG=" -DLIBRDKCONFIG_BUILD ";;
+           no)  IS_LIBRDKCONFIG_ENABLED=false ;;
+          *) AC_MSG_ERROR([bad value ${enableval} for --enable-mountutils]) ;;
+           esac
+           ],
+        [echo "mountutils is disabled"])
+AM_CONDITIONAL([IS_LIBRDKCONFIG_ENABLED], [test x$IS_LIBRDKCONFIG_ENABLED = xtrue])
+AC_SUBST(LIBRDKCONFIG_FLAG)
 
 # Checks for library functions.
 AC_CHECK_FUNCS([memset])

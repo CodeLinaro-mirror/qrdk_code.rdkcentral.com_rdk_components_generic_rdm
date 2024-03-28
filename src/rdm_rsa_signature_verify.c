@@ -20,6 +20,9 @@
 
 
 #include "rdm_rsa_signature_verify.h"
+#ifdef LIBRDKCONFIG_BUILD
+#include "rdkconfig.h"
+#endif
 
 #if defined(DEBUG_ENABLED)
 static time_t timebuffer;
@@ -238,11 +241,32 @@ static int prepare_app_manifest(char *etc_manifest_file, char *cache_manifest_fi
         return 0;
 }
 
-static int prepare_kms_pubkey() {
+#ifdef LIBRDKCONFIG_BUILD
+static int prepare_kms_pubkey_config( uint8_t **pubkey, size_t *pubsize )
+{ 
+        int ret;
+        uint8_t *credbuf=NULL;
+        size_t credsize;
+        ret= rdkconfig_get(&credbuf, &credsize, "/tmp/vstuvwx.file");
+        if(ret == RDKCONFIG_OK)
+        {
+            if(credbuf[credsize - 1] == '\n')
+            {
+                credbuf[credsize - 1]='\0';                
+            }
+        }
+       *pubkey=credbuf;
+       *pubsize=credsize;
+
+        return ret;
+}
+#else
+static int prepare_kms_pubkey() {      
         int ret;
         ret = system("/usr/bin/configparamgen jx /etc/rdm/vjyrepbsb.ijv /tmp/vstuvwx.file");
         return WEXITSTATUS(ret);
 }
+#endif
 
 /**
  *
@@ -252,7 +276,7 @@ static int prepare_kms_pubkey() {
  * 2. Prepare cpe manifest file with correct path to extracted files
  * 3. Decrypt kms public key
  */
-static int prepare_rdm_files_for_sign_verification(char *cache_dir, char *app_name)
+static int prepare_rdm_files_for_sign_verification(char *cache_dir, char *app_name )
 {
         char *app_cache_dir = NULL;
         char *app_home_dir = NULL;
@@ -307,8 +331,9 @@ static int prepare_rdm_files_for_sign_verification(char *cache_dir, char *app_na
         if (ret) {
             return ret;
         }
-
+#if !defined LIBRDKCONFIG_BUILD
         ret = prepare_kms_pubkey();
+#endif
 
         return ret;
 }
@@ -333,13 +358,15 @@ int rdm_signature_verify(char *cache_dir, char *app_name, int prepare_files)
                 printf("prepare_rdm_files_for_sign_verification failed\n");
                 return status;
             }
-        } else {
-            if (0 != prepare_kms_pubkey()) {
+        } 
+#if !defined LIBRDKCONFIG_BUILD
+        else {
+              if (0 != prepare_kms_pubkey()) {
                 printf("prepare_kms_pubkey failed\n");
                 return status;
-            }
+             }
         }
-
+#endif
         /* Initialize the openSSL crypto library and configurations */
         init_ssl_lib();
 
@@ -358,11 +385,11 @@ int rdm_signature_verify(char *cache_dir, char *app_name, int prepare_files)
         } else {
             printf("RSA Signature Verification Failed\n");
         }
-
         free(dataFile);
         free(sigFile);
-
+#if !defined LIBRDKCONFIG_BUILD  
         unlink(RDM_KMS_PUB_KEY);
+#endif  
         return status;
 }
 
@@ -751,9 +778,8 @@ int openssl_verify_signature(const unsigned char *hashval, int hashval_len, cons
         unsigned char *sig;
         int sig_len;
         int retval;
-
-
-        /* Only one parameter hasn't been checked by the calling code */
+        
+       /* Only one parameter hasn't been checked by the calling code */
         if ( hashval == NULL ) {
                 return retcode_param_error;
         }
@@ -785,6 +811,21 @@ int openssl_verify_signature(const unsigned char *hashval, int hashval_len, cons
          */
 
         /* initialize `key` with a public key */
+#ifdef LIBRDKCONFIG_BUILD
+        BIO *pBio_Pem  = NULL;
+        pBio_Pem = BIO_new_mem_buf((char *)vkey_file, (int)strlen(vkey_file));
+        if (pBio_Pem == NULL) {
+            debug_print("Unable to assign the PEM to BIO buffer.");
+            goto error;
+        }
+
+        /* Convert the BIO to PKEY format. */
+        pkey = PEM_read_bio_PUBKEY(pBio_Pem, NULL, NULL, NULL);  
+        if (pkey == NULL) {
+           debug_print("Unable to read the key from PEM.");
+           goto error;
+        }
+#else
         debug_print("reading key file: %s\n",vkey_file);
         FILE *pub_fh = fopen( vkey_file, "rb" );
         if ( pub_fh == NULL ) {
@@ -798,40 +839,39 @@ int openssl_verify_signature(const unsigned char *hashval, int hashval_len, cons
                 debug_print( "pubkey read fail\n" );
                 goto error;
         }
-
+#endif
         /* reinit a digest context */
         EVP_MD_CTX_destroy( mdctx );
         if((mdctx = EVP_MD_CTX_create()) == NULL) {
                 debug_print( "verify context create fail\n" );
                 goto error;
         }
-
         /* Initialize verify */
         if(1 != EVP_DigestVerifyInit(mdctx, NULL, EVP_sha256(), NULL, pkey)) {
                 debug_print( "digest verify init fail\n" );
                 goto err;
         }
-
         /* perform verify */
         if( 1 != EVP_DigestVerifyUpdate( mdctx, hash_ascii, SHA256_ASCII_DIGEST_LENGTH ) ) {
                 debug_print( "digest verify update fail\n" );
                 goto err;
         }
-
         /* check verify */
         if(1 == EVP_DigestVerifyFinal( mdctx, sig, sig_len) )
-        {
+        {              
                 retval = retcode_success;
         }
         else
         {
                 retval = retcode_verify_fail;
         }
+
 err:
 error:
-
         if ( sig_fh != NULL ) fclose( sig_fh );
+#if !defined(LIBRDKCONFIG_BUILD)
         if ( pub_fh != NULL ) fclose( pub_fh );
+#endif
         if ( mdctx != NULL ) EVP_MD_CTX_destroy( mdctx );
 	//CID 314565: Use after free (USE_AFTER_FREE)
 
@@ -865,8 +905,18 @@ error:
 
          unsigned char hashval[SHA256_DIGEST_LENGTH];
          int hashval_len=SHA256_DIGEST_LENGTH;
-
          debug_print("Entry: rdm_openssl_rsa_file_signature_verify\n");
+#ifdef LIBRDKCONFIG_BUILD
+         uint8_t *key = NULL;
+         size_t keysize;
+         retval = prepare_kms_pubkey_config(&key, &keysize);
+         if (retval) {
+             debug_print("prepare_kms_pubkey_config() failed\n");
+             return retval;
+         }
+         vkey_file=(const char*)key;
+#endif
+
          if ( data_file == NULL ||
                          sig_file == NULL ||
                          reply_msg == NULL ||

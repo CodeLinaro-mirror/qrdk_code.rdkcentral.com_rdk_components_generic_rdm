@@ -16,8 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
+
 lib_LTLIBRARIES = librdmopenssl.la
 librdmopenssl_la_SOURCES = rdm_rsa_signature_verify.c
+
+if IS_LIBRDKCONFIG_ENABLED
+librdmopenssl_la_CFLAGS = $(LIBRDKCONFIG_FLAG)
+librdmopenssl_la_LDFLAGS = -lrdkconfig -lsecure_wrapper
+endif
 
 bin_PROGRAMS = opensslVerify
 opensslVerify_SOURCES = main.c
