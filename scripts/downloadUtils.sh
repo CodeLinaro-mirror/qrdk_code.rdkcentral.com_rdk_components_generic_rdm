@@ -592,7 +592,13 @@ applicationDownload()
                 log_msg "applicationDownload: Direct App download blocked"
                 return 1
             fi
-            # Retry image download attempts via CodeBig
+
+            if [ $ret -ne 0 ] && [ "$http_code" != "200" ]; then
+                 log_msg "applicationDownload: Direct App download failed after $DOWNLOAD_APP_RETRY_COUNT attempts"
+                 return 1
+            fi
+
+	    # Retry image download attempts via CodeBig
             if [ $ret -ne 0 ] && [ "$http_code" == "000" ]; then
                 if [ "$DEVICE_TYPE" = "mediaclient" ];then
                     log_msg "applicationDownload: Direct App download failed with return:$ret, httpcode:$http_code , Retrying to SSR via CodeBig server"
