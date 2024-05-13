@@ -593,12 +593,7 @@ applicationDownload()
                 return 1
             fi
 
-            if [ $ret -ne 0 ] && [ "$http_code" != "200" ]; then
-                 log_msg "applicationDownload: Direct App download failed after $DOWNLOAD_APP_RETRY_COUNT attempts"
-                 return 1
-            fi
-
-	    # Retry image download attempts via CodeBig
+            # Retry image download attempts via CodeBig
             if [ $ret -ne 0 ] && [ "$http_code" == "000" ]; then
                 if [ "$DEVICE_TYPE" = "mediaclient" ];then
                     log_msg "applicationDownload: Direct App download failed with return:$ret, httpcode:$http_code , Retrying to SSR via CodeBig server"
@@ -640,15 +635,23 @@ applicationDownload()
                     fi
                 else
                     log_msg "applicationDownload: Direct App download failed with return:$ret, httpcode:$http_code after $DOWNLOAD_APP_RETRY_COUNT attempts"
+                    log_msg "applicationDownload: Not a mediaclient device. Hence not eligible for Codebig connection"
                     exit 4
+                fi
+            else
+                if [ $ret -ne 0 ]; then
+                    log_msg "applicationDownload: httpcode is $http_code. Hence not eligible for Codebig connection"
                 fi
             fi
         fi
     fi
-              
-    if [ -f $DOWNLOAD_LOCATION/$downloadFile ];then
-         log_msg "Size Info After Download: `ls -lh $DOWNLOAD_LOCATION/$downloadFile`"
+    
+    if [ -s $DOWNLOAD_LOCATION/$downloadFile ]; then
+         log_msg "applicationDownload: Size Info After Download: `ls -lh $DOWNLOAD_LOCATION/$downloadFile`"
          return 0
+    else
+         log_msg "applicationDownload: ${downloadFile} download failed"
+         return 1
     fi
 }
 
