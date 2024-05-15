@@ -41,7 +41,7 @@ fi
 
 log_msg() {
   #get current dateandtime
-  DateTime=`date "+%m%d%y-%H:%M:%S:%N"`
+  DateTime=`/bin/timestamp`
   STR=""
   PID=$$
 
@@ -58,5 +58,5 @@ log_msg() {
   fi
 
   #print log message
-  echo "[$DateTime] [pid=$PID] $STR" >>$LOG_FILE
+  echo "$DateTime [pid=$PID] $STR" >>$LOG_FILE
 }

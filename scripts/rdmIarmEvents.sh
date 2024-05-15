@@ -37,11 +37,17 @@ RDM_PKG_POSTINSTALL_COMPLETE=8
 RDM_PKG_POSTINSTALL_ERROR=9
 RDM_PKG_UNINSTALL=10
 RDM_PKG_INVALID_INPUT=11
+RDM_PKG_TMP_FILE=/tmp/rdm_status.tmp
 
 broadcastRDMPkgStatus()
 {
         PKG_INFO="$1"
         if type IARM_event_sender &> /dev/null; then
-            IARM_event_sender "$IARM_BUS_RDMMGR_EVENTNAME_APP_INSTALLATION_STATUS" "$IARM_BUS_RDMMGR_EVENT_APP_INSTALLATION_STATUS" "$(echo -e $PKG_INFO)" >> ${LOG_PATH}/rdm_status.log 2>&1
+            IARM_event_sender "$IARM_BUS_RDMMGR_EVENTNAME_APP_INSTALLATION_STATUS" "$IARM_BUS_RDMMGR_EVENT_APP_INSTALLATION_STATUS" "$(echo -e $PKG_INFO)" > $RDM_PKG_TMP_FILE 2>&1
+            while read -r line
+            do
+                echo "`/bin/timestamp` $line" >> ${LOG_PATH}/rdm_status.log
+            done < $RDM_PKG_TMP_FILE
+            rm $RDM_PKG_TMP_FILE
         fi
 }
