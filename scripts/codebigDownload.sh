@@ -106,7 +106,8 @@ getCodebigUrl()
        request_type=1
 
        # Use DAC15 codebig Endpoint url for Non-Prod builds
-       if [ "$domainName" == "dac15cdlserver.ae.ccp.xcal.tv" ]; then
+       DAC15_URL=$(tr181 -g Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Sysint.DAC15CDLUrl 2>&1)
+       if [ "$domainName" == "$DAC15_URL" ]; then
            request_type=14
        fi
 
