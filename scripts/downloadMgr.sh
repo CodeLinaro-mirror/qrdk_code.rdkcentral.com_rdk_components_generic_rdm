@@ -267,22 +267,28 @@ fi
 
 # Extract the Package
 package_signatureFile=$( is_file_exists $DOWNLOAD_LOCATION/*-pkg.sig )
-
 package_tarFile=$( is_file_exists $DOWNLOAD_LOCATION/*-pkg.tar )
+package_ipkfile=$( is_file_exists $DOWNLOAD_LOCATION/*.ipk )
+
 pkg_extracted=false
 # Keeping backup of signature and tarball on secondary storage to avoid top level package extraction on every reboot
 # As extraction could account for the SD card write cycle on every reboot.
-if ! [[  -f $DOWNLOAD_LOCATION/$package_signatureFile && -f $DOWNLOAD_LOCATION/$package_tarFile ]]; then
+if ! [[  -f $DOWNLOAD_LOCATION/$package_signatureFile && -f $DOWNLOAD_LOCATION/$package_tarFile && -f $DOWNLOAD_LOCATION/$package_ipkfile ]]; then
+    log_msg "Found missing Package Sigfile or Package tarfile or Package ipk file in location $DOWNLOAD_LOCATION"
     log_msg "Extracting The Package $url/${DOWNLOAD_PKG_NAME}"
     applicationExtraction $url/${DOWNLOAD_PKG_NAME}
 else
     pkg_extracted=true
 fi
 
+log_msg "Extracted Files:$package_signatureFile $package_tarFile $package_ipkfile"
+ls -l $DOWNLOAD_LOCATION/$package_signatureFile
+ls -l $DOWNLOAD_LOCATION/$package_ipkfile
+ls -l $DOWNLOAD_LOCATION/$package_tarFile
+    
 package_tarFile=$( is_file_exists $DOWNLOAD_LOCATION/*-pkg.tar )
 log_msg "Intermediate PKG File: $package_tarFile"
 if [ $package_tarFile ] && [ -f $DOWNLOAD_LOCATION/$package_tarFile ];then
-      ls -l $DOWNLOAD_LOCATION/$package_tarFile
       hashVal=`sha256sum $DOWNLOAD_LOCATION/$package_tarFile | cut -d " " -f1`
       if [ "x$pkg_extracted" != "xtrue" ]; then
           tar -xvf $DOWNLOAD_LOCATION/$package_tarFile -C $DOWNLOAD_LOCATION/ >> $LOG_PATH/rdm_status.log 2>&1
@@ -326,7 +332,7 @@ else
              loop=`expr $loop + 1`
              case "${extension}" in
              ipk )
-                log_msg "Size of ipk [$finalPackage]: `ls -lh $finalPackage`"
+                log_msg "Size of ipk [$finalPackage]: `ls -lH $finalPackage`"
                 ar -x $finalPackage
                 if [ $? -ne 0 ];then
                      log_msg "IPK Extraction of $finalPackage Failed.."
@@ -335,7 +341,7 @@ else
                      umask 544
                      #default compression method in opkg is gz for daisy/morty and xz for dunfell
                      data_file=`ls data.tar.* | tail -n1`
-                     log_msg "Size of data [$data_file]: `ls -lh $data_file`"
+                     log_msg "Size of data [$data_file]: `ls -lH $data_file`"
                      tar -xvf $data_file -C $APPLN_HOME_PATH/ >> $LOG_PATH/rdm_status.log 2>&1
                      if [ $? -ne 0 ];then
                           log_msg "tar Extraction Failed for $data_file"
@@ -394,10 +400,6 @@ else
              esac
           done
 
-          if [ -f ./${finalPackage} ];then
-               log_msg "Removing $finalPackage after Extraction"
-               rm -rf ./$finalPackage
-          fi
         done <$DOWNLOAD_LOCATION/packages.list
     else
         log_msg "Not Found the Packages List file"
@@ -507,7 +509,6 @@ log_msg "$DOWNLOAD_LOCATION// CleanUp"
 if [ "$APPLN_HOME_PATH" != "$APP_MOUNT_PATH/${DOWNLOAD_APP_MODULE}" ]; then
     rm -rf $DOWNLOAD_LOCATION/$downloadFile
 fi
-rm -rf $DOWNLOAD_LOCATION/*.ipk
 for script in ${APPLN_HOME_PATH}/etc/rdm/post-services/*.sh; do
     if [ -f $script ]; then
         [ -r $script ] && sh $script &> /dev/null

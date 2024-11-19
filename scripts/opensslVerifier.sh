@@ -167,26 +167,40 @@ log_msg "Validate the Package"
 if [ -f /usr/bin/opensslVerify ];then
       if [ -e $CPEMANIFEST -a -n "$(echo $WORKDIR | awk '/^\/media\/apps\//')" ]; then
           if [ "$PROCESS_CUSTOM_BUNDLE" = "1" ]; then
+              log_msg "Generating cpemanifest for RDM Bundle in $SDCARD_DLPATH"
               app_dir=$(echo "$APP_HOME_DIR/" | sed 's/\//\\\//g')
               sed -e "s/^/$app_dir/" -i $CPEMANIFEST_PATH
               sed -e "/${CPEMETADATA}/c\\${CPEMETADATA_PATH}" -i $CPEMANIFEST_PATH
+              echo "$WORKDIR/pkg_padding" >> $CPEMANIFEST_PATH
           else
+              log_msg "Generating cpemanifest for Apps in $SDCARD_DLPATH"
               CPEMANIFEST_PATH=$SDCARD_DLPATH/${APP_NAME}_cpemanifest
-              cp $CPEMANIFEST $CPEMANIFEST_PATH
-              sed -e "s/^/\/media\/apps\/${APP_NAME}\//" -i $CPEMANIFEST_PATH
+              if [ ! -f $CPEMANIFEST_PATH ]; then
+                  log_msg "Copying ${APP_NAME}_cpemanifest to $SDCARD_DLPATH folder"
+                  cp $CPEMANIFEST $CPEMANIFEST_PATH
+                  sed -e "s/^/\/media\/apps\/${APP_NAME}\//" -i $CPEMANIFEST_PATH
+                  echo "$WORKDIR/pkg_padding" >> $CPEMANIFEST_PATH
+              fi
+              log_msg "${APP_NAME}_cpemanifest file found in $SDCARD_DLPATH folder"
           fi
-          echo "$WORKDIR/pkg_padding" >> $CPEMANIFEST_PATH
       elif [ -e $CPEMANIFEST -a -n "$(echo $WORKDIR | awk '/^\/tmp\//')" ]; then
           if [ "$PROCESS_CUSTOM_BUNDLE" = "1" ]; then
+              log_msg "Generating cpemanifest for RDM Bundle in $TMP_DLPATH"
               app_dir=$(echo "$APP_HOME_DIR/" | sed 's/\//\\\//g')
               sed -e "s/^/$app_dir/" -i $CPEMANIFEST_PATH
               sed -e "/${CPEMETADATA}/c\\${CPEMETADATA_PATH}" -i $CPEMANIFEST_PATH
+              echo "$WORKDIR/pkg_padding" >> $CPEMANIFEST_PATH
           else
+              log_msg "Generating cpemanifest for Apps in $TMP_DLPATH"
               CPEMANIFEST_PATH=$TMP_DLPATH/${APP_NAME}_cpemanifest
-              cp $CPEMANIFEST $CPEMANIFEST_PATH
-              sed -e "s/^/\/tmp\/$APP_NAME\//" -i $CPEMANIFEST_PATH
+              if [ ! -f $CPEMANIFEST_PATH ]; then
+                  log_msg "Copying ${APP_NAME}_cpemanifest to $TMP_DLPATH folder"
+                  cp $CPEMANIFEST $CPEMANIFEST_PATH
+                  sed -e "s/^/\/tmp\/$APP_NAME\//" -i $CPEMANIFEST_PATH
+                  echo "$WORKDIR/pkg_padding" >> $CPEMANIFEST_PATH
+              fi
+              log_msg "${APP_NAME}_cpemanifest file found in $TMP_DLPATH folder"
           fi
-          echo "$WORKDIR/pkg_padding" >> $CPEMANIFEST_PATH
       else
           CPEMANIFEST_PATH=""
       fi
