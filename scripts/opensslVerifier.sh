@@ -120,16 +120,16 @@ fi
 # Decode the RSA Public Key
 if [ "$SIGNATURE_TYPE" = "kms" ];then
         log_msg "Package with KMS signature"
-        CONFIGPARAMGEN=/usr/bin/configparamgen
+        GETCONFIGFILE=/usr/bin/GetConfigFile
         KMS_RSA_PUBLIC_KEY_FILE=/etc/rdm/vjyrepbsb.ijv
-        KMS_INTERMEDIATE_RSA_KEY_FILE=${WORKDIR}/vstuvwx.file
+        KMS_INTERMEDIATE_RSA_KEY_FILE=/tmp/rdmconfig.file
         # TODO Will remove this line once the code is stable
         cat $WORKDIR/$SIGNATURE_FILE
         # Decrypt the Key for Codebig
-        if [ -f $CONFIGPARAMGEN ]; then
-            $CONFIGPARAMGEN jx $KMS_RSA_PUBLIC_KEY_FILE $KMS_INTERMEDIATE_RSA_KEY_FILE
+        if [ -f $GETCONFIGFILE ]; then
+            $GETCONFIGFILE $KMS_INTERMEDIATE_RSA_KEY_FILE
         else
-            log_msg "${CONFIGPARAMGEN} not found. Creating dummy key file"
+            log_msg "${GETCONFIGFILE} not found. Creating dummy key file"
             touch $KMS_INTERMEDIATE_RSA_KEY_FILE
         fi
 elif [ "$SIGNATURE_TYPE" = "openssl" ]; then

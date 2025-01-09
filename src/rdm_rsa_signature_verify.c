@@ -247,7 +247,7 @@ static int prepare_kms_pubkey_config( uint8_t **pubkey, size_t *pubsize )
         int ret;
         uint8_t *credbuf=NULL;
         size_t credsize;
-        ret= rdkconfig_get(&credbuf, &credsize, "/tmp/vstuvwx.file");
+        ret= rdkconfig_get(&credbuf, &credsize, RDM_KMS_PUB_KEY);
         if(ret == RDKCONFIG_OK)
         {
             if(credbuf[credsize - 1] == '\n')
@@ -263,7 +263,7 @@ static int prepare_kms_pubkey_config( uint8_t **pubkey, size_t *pubsize )
 #else
 static int prepare_kms_pubkey() {      
         int ret;
-        ret = system("/usr/bin/configparamgen jx /etc/rdm/vjyrepbsb.ijv /tmp/vstuvwx.file");
+        ret = system("/usr/bin/GetConfigFile /tmp/rdmconfig.file");
         return WEXITSTATUS(ret);
 }
 #endif

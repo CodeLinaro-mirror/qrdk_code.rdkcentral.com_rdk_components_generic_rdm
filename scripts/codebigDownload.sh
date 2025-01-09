@@ -32,7 +32,7 @@ else
     echo "File Not Found, /etc/rdm/loggerUtils.sh"
 fi
 
-CONFIGPARAMGEN=/usr/bin/configparamgen
+GETSERVICEURL=/usr/bin/GetServiceUrl
 DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail_rdm"
 DIRECT_BLOCK_TIME=86400
 CB_BLOCK_FILENAME="/tmp/.lastcodebigfail_rdm"
@@ -100,7 +100,7 @@ getCodebigUrl()
 {
     dnlUrl=$1
 
-    if [ -f $CONFIGPARAMGEN ];then
+    if [ -f $GETSERVICEURL ];then
        domainName=`echo $dnlUrl | awk -F/ '{print $3}'`
        imageHTTPURL=`echo $dnlUrl | sed -e "s|.*$domainName||g"`
        request_type=1
@@ -109,9 +109,8 @@ getCodebigUrl()
        DAC15_URL=$(tr181 -g Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Sysint.DAC15CDLUrl 2>&1)
        if [ "$domainName" == "$DAC15_URL" ]; then
            request_type=14
-       fi
-
-       SIGN_CMD="$CONFIGPARAMGEN $request_type \"$imageHTTPURL\""
+       fi 
+       SIGN_CMD="$GETSERVICEURL $request_type \"$imageHTTPURL\""
        eval $SIGN_CMD > /tmp/.signedRequest
        cbSignedimageHTTPURL=`cat /tmp/.signedRequest`
        rm -f /tmp/.signedRequest
@@ -123,7 +122,7 @@ getCodebigUrl()
        authorizationHeader=`echo $cbSignedimageHTTPURL | sed -e "s|&|\", |g" -e "s|=|=\"|g" -e "s|.*oauth_consumer_key|oauth_consumer_key|g"`
        authorizationHeader="Authorization: OAuth realm=\"\", $authorizationHeader\""
     else
-       log_msg "getCodebigUrl: $CONFIGPARAMGEN file not found"
+       log_msg "getCodebigUrl: $GETSERVICEURL file not found"
        exit -1
     fi
 }

@@ -47,7 +47,8 @@ if [ -z $LOG_PATH ]; then
 fi
 
 JSONQUERY="/usr/bin/jsonquery"
-CONFIGPARAMGEN=/usr/bin/configparamgen
+GETCONFIGFILE=/usr/bin/GetConfigFile
+GETSERVICEURL=/usr/bin/GetServiceUrl
 DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail"
 DIRECT_BLOCK_TIME=86400
 CB_BLOCK_FILENAME="/tmp/.lastcodebigfail"
@@ -212,7 +213,7 @@ getDownloadUrl()
         counter=0
         log_msg "DOWNLOADING: /tmp/.xconfssrdownloadurl from ARM Side"
         if [ ! -f $PEER_COMM_ID ]; then
-            $CONFIGPARAMGEN jx $PEER_COMM_DAT $PEER_COMM_ID
+            $GETCONFIGFILE $PEER_COMM_ID
         fi
         while [ $checkstatus -eq 1 ]
         do
@@ -312,7 +313,7 @@ get_Codebigconfig()
        conn_str="Direct"
    
        # If configparamgen not available, then only direct connection available and no fallback mechanism
-       if [ -f $CONFIGPARAMGEN ]; then
+       if [ -f $GETSERVICEURL ]; then
           CodebigAvailable=1
        fi
        if [ "$CodebigAvailable" -eq "1" ]; then
@@ -337,7 +338,7 @@ get_Codebigconfig()
 getCodebigUrl()
 {
     dnlUrl=$1
-    if [ -f $CONFIGPARAMGEN ];then
+    if [ -f $GETSERVICEURL ];then
        domainName=`echo $dnlUrl | awk -F/ '{print $3}'`
        imageHTTPURL=`echo $dnlUrl | sed -e "s|.*$domainName||g"`
        request_type=1
@@ -346,7 +347,7 @@ getCodebigUrl()
        if [ "$domainName" == "$DAC15_URL" ]; then
            request_type=14
        fi
-       SIGN_CMD="$CONFIGPARAMGEN $request_type \"$imageHTTPURL\""
+       SIGN_CMD="$GETSERVICEURL $request_type \"$imageHTTPURL\""
        eval $SIGN_CMD > /tmp/.signedRequest_${DOWNLOAD_APP_MODULE}
        cbSignedimageHTTPURL=`cat /tmp/.signedRequest_${DOWNLOAD_APP_MODULE}`
        rm -f /tmp/.signedRequest_${DOWNLOAD_APP_MODULE}
@@ -358,7 +359,7 @@ getCodebigUrl()
        authorizationHeader=`echo $cbSignedimageHTTPURL | sed -e "s|&|\", |g" -e "s|=|=\"|g" -e "s|.*oauth_consumer_key|oauth_consumer_key|g"`
        authorizationHeader="Authorization: OAuth realm=\"\", $authorizationHeader\""
     else
-       log_msg "getCodebigUrl: $CONFIGPARAMGEN file not found"
+       log_msg "getCodebigUrl: $GETSERVICEURL file not found"
        exit 2
     fi
 }
