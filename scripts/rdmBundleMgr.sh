@@ -398,6 +398,11 @@ do
                 else
                         log "${cloud_bundle_name} package installed successfully"
                         updatePkgStatus "$RDM_PKG_INSTALL_COMPLETE"
+			rbuscli set Device.DeviceInfo.X_RDKCENTRAL-COM_RDKDownloadManager.DownloadStatus bool true
+                        DownloadStatus= $(syscfg get RemoteDebuggerBoolValue)
+                        if [ "$DownloadStatus" = "true" ]; then
+                                log "rbus set successful for DownloadStatus ..."
+                        fi
                 fi
         fi
 done
